@@ -24,6 +24,7 @@
 #include "third_party/absl/strings/str_join.h"
 #include "third_party/absl/strings/str_replace.h"
 #include "util.h"
+#include "sentencepiece_processor.h"
 
 namespace sentencepiece {
 namespace bpe {
@@ -79,6 +80,17 @@ Trainer::Symbol *Trainer::GetPairSymbol(const Symbol *left,
   s->right = right;
   s->chars = ut;
   port::InsertOrDie(&symbols_cache_, s->fp, s);
+  return s;
+}
+
+Trainer::Symbol *Trainer::ConvertToSymbol(std::string str) {
+  auto unicodeText = string_util::UTF8ToUnicodeText(str);
+  Symbol *s = GetCharSymbol(unicodeText[0]);
+  for (size_t i = 1; i < unicodeText.size(); ++i) {
+    char32 c = unicodeText[i];
+    Symbol *s1 = GetCharSymbol(c);
+    s = GetPairSymbol(s, s1);
+  }
   return s;
 }
 
@@ -163,6 +175,28 @@ void Trainer::UpdateActiveSymbols() {
   active_symbols_.insert(symbols.begin(), symbols.begin() + size);
 }
 
+bool Trainer::hasMoreThanOneChar(const std::string& str) {
+    return string_util::UTF8ToUnicodeText(str).size()>1;
+}
+
+void Trainer::get_old_vocab(std::vector<std::string>& moreThanOneChar, std::vector<char32>& oneChar) {
+  std::ifstream file(trainer_spec_.old_vocab());
+  std::string line;
+  while (std::getline(file, line)) {
+      std::istringstream iss(line);
+      std::string str;
+      int num;
+      if (!(iss >> str >> num)) { continue; } // 解析失败
+      if (num == 0 && line.find("-0") == std::string::npos) { continue; } // 忽略 0 但保留 -0
+      if (hasMoreThanOneChar(str)) {
+          moreThanOneChar.push_back(str);
+      } else {
+          oneChar.push_back(string_util::UTF8ToUnicodeText(str)[0]);
+      }
+  }
+  return;
+}
+
 util::Status Trainer::Train() {
   RETURN_IF_ERROR(status());
 
@@ -214,8 +248,23 @@ util::Status Trainer::Train() {
     }
   }
 
+  std::vector<std::string> moreThanOneChar;
+  std::vector<char32> oneChar;
+  get_old_vocab(moreThanOneChar, oneChar);
+  SetInitialBestSymbols(moreThanOneChar);
+
+  // remove oneChar from required_chars
+  for (char32 chr: oneChar){
+    for (const auto &w : required_chars_) {
+      if (chr==w.first){
+        required_chars_.erase(w.first);
+        break;
+      }
+    }
+  }
+
   const int vocab_size =
-      trainer_spec_.vocab_size() - meta_pieces_.size() - required_chars_.size();
+      trainer_spec_.vocab_size() - meta_pieces_.size() - required_chars_.size() - oneChar.size();
   CHECK_GE_OR_RETURN(vocab_size, 0);
 
   // We may see duplicated pieces that are extracted with different path.
@@ -233,19 +282,31 @@ util::Status Trainer::Train() {
 
     // Scanning active symbols, finds the best_symbol with highest freq.
     Symbol *best_symbol = nullptr;
-    for (auto &it : active_symbols_) {
-      Symbol *symbol = it;
-      ComputeFreq(symbol);
-      // If the frequency is the same, take shorter symbol.
-      // if the length is the same, use lexicographical comparison
-      if (best_symbol == nullptr ||
-          (symbol->freq > best_symbol->freq ||
-           (symbol->freq == best_symbol->freq &&
-            (symbol->chars.size() < best_symbol->chars.size() ||
-             (symbol->chars.size() == best_symbol->chars.size() &&
-              symbol->ToString() < best_symbol->ToString()))))) {
-        best_symbol = symbol;
+    if (initial_best_symbols_.empty()){
+      if (active_symbols_.empty()) break;
+      for (auto &it : active_symbols_) {
+        Symbol *symbol = it;
+        ComputeFreq(symbol);
+        // If the frequency is the same, take shorter symbol.
+        // if the length is the same, use lexicographical comparison
+        if (best_symbol == nullptr ||
+            (symbol->freq > best_symbol->freq ||
+            (symbol->freq == best_symbol->freq &&
+              (symbol->chars.size() < best_symbol->chars.size() ||
+              (symbol->chars.size() == best_symbol->chars.size() &&
+                symbol->ToString() < best_symbol->ToString()))))) {
+          best_symbol = symbol;
+        }
       }
+      if (best_symbol->freq<trainer_spec_.min_freq()){
+        // Removes best_symbol so it is not selected again.
+        symbols_cache_.erase(best_symbol->fp);
+        active_symbols_.erase(best_symbol);
+        continue;
+      }
+    } else{
+      best_symbol = ConvertToSymbol(initial_best_symbols_.front());
+      initial_best_symbols_.erase(initial_best_symbols_.begin());
     }
 
     if (best_symbol == nullptr) {
@@ -308,11 +369,18 @@ util::Status Trainer::Train() {
     active_symbols_.erase(best_symbol);
   }  // end of main loop
 
+  // Adds one char in old_vocab
+  for (const auto w : oneChar) {
+    const Symbol *symbol = GetCharSymbol(w);
+      final_pieces_.emplace_back(symbol->ToString(),
+                               -static_cast<float>(final_pieces_.size()));  
+  }
+
   // Adds required_chars_
   for (const auto &w : Sorted(required_chars_)) {
     const Symbol *symbol = GetCharSymbol(w.first);
-    final_pieces_.emplace_back(symbol->ToString(),
-                               -static_cast<float>(final_pieces_.size()));
+      final_pieces_.emplace_back(symbol->ToString(),
+                               -static_cast<float>(final_pieces_.size()));      
   }
 
   port::STLDeleteElements(&allocated_);

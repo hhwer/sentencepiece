@@ -20,7 +20,7 @@ option optimize_for = LITE_RUNTIME;
 package sentencepiece;
 
 // TrainerSpec encodes a various parameters for SentencePiece training.
-// Next id: 54
+// Next id: 56
 message TrainerSpec {
   ///////////////////////////////////////////////////////////////////
   // General parameters
@@ -234,6 +234,8 @@ message TrainerSpec {
 
   // Customized extensions: the range of field numbers
   // are open to third-party extensions.
+  optional int32 min_freq = 54 [default = 10];
+  optional string old_vocab = 55;
   extensions 200 to max;
 }
 

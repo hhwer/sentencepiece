@@ -40,6 +40,10 @@ ABSL_FLAG(std::string, model_type, "unigram",
           "model algorithm: unigram, bpe, word or char");
 ABSL_FLAG(int32, vocab_size, kDefaultTrainerSpec.vocab_size(),
           "vocabulary size");
+ABSL_FLAG(int32, min_freq, kDefaultTrainerSpec.min_freq(),
+          "min freq for threshold");
+ABSL_FLAG(std::string, old_vocab, "",
+          "file-path of old vocab");
 ABSL_FLAG(std::string, accept_language, "",
           "comma-separated list of languages this model can accept");
 ABSL_FLAG(int32, self_test_sample_size,
@@ -216,6 +220,8 @@ int main(int argc, char *argv[]) {
   SetTrainerSpecFromFlag(input_format);
   SetTrainerSpecFromFlag(model_prefix);
   SetTrainerSpecFromFlag(vocab_size);
+  SetTrainerSpecFromFlag(min_freq);
+  SetTrainerSpecFromFlag(old_vocab);
   SetTrainerSpecFromFlag(self_test_sample_size);
   SetTrainerSpecFromFlag(character_coverage);
   SetTrainerSpecFromFlag(input_sentence_size);

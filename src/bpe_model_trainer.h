@@ -64,6 +64,8 @@ class Trainer : public TrainerInterface {
     int right;  // right symbol index
   };
 
+  std::vector<std::string> initial_best_symbols_;
+
   // Encodes sid, left and right bigram index into uint64_t.
   // Encoded value keeps the order of sid, left and right.
   static uint64_t EncodePos(int sid, int l, int r) {
@@ -93,6 +95,7 @@ class Trainer : public TrainerInterface {
   // Gets symbol pair from left/right symbols. The return value is cached.
   Symbol *GetPairSymbol(const Symbol *left, const Symbol *right);
 
+  Symbol *ConvertToSymbol(std::string s);
   // Computes the frequency of |symbol| and update symbol->freq field.
   void ComputeFreq(Symbol *symbol) const;
 
@@ -113,6 +116,13 @@ class Trainer : public TrainerInterface {
   // Updates |active_symbols_| by copying the top 5% frequent symbols in
   // symbols_cache_.
   void UpdateActiveSymbols();
+
+  void SetInitialBestSymbols(const std::vector<std::string>& initial_best_symbols) {
+    initial_best_symbols_ = initial_best_symbols;
+  }
+
+  bool hasMoreThanOneChar(const std::string& str);
+  void get_old_vocab(std::vector<std::string>& moreThanOneChar, std::vector<char32>& oneChar);
 
   // All unique symbols. Key is a fingerprint of Symbol.
   absl::flat_hash_map<uint64_t, Symbol *> symbols_cache_;
