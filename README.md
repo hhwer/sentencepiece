@@ -161,13 +161,13 @@ install without sudo in local path
 % cd sentencepiece
 % mkdir build
 % cd build
-% cmake .. -DCMAKE_INSTALL_PREFIX=~/sentencepiece_install
-% make -j $(nproc)
-% sudo make install
-% sudo ldconfig -v
-% export PATH=~/sentencepiece_install/bin:$PATH
-% export LD_LIBRARY_PATH=~/sentencepiece_install/lib:$LD_LIBRARY_PATH
-
+cmake .. -DCMAKE_INSTALL_PREFIX=~/sentencepiece_install
+make -j $(nproc)
+make install
+ldconfig -v
+export PATH=~/sentencepiece_install/bin:$PATH
+export LD_LIBRARY_PATH=~/sentencepiece_install/lib:$LD_LIBRARY_PATH
+```
 On OSX/macOS, replace the last command with `sudo update_dyld_shared_cache`
 
 ### Build and install using vcpkg
