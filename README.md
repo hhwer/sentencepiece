@@ -154,6 +154,20 @@ Then, you can build and install command line tools as follows.
 % sudo make install
 % sudo ldconfig -v
 ```
+
+install without sudo in local path
+```
+% git clone https://github.com/google/sentencepiece.git 
+% cd sentencepiece
+% mkdir build
+% cd build
+% cmake .. -DCMAKE_INSTALL_PREFIX=~/sentencepiece_install
+% make -j $(nproc)
+% sudo make install
+% sudo ldconfig -v
+% export PATH=~/sentencepiece_install/bin:$PATH
+% export LD_LIBRARY_PATH=~/sentencepiece_install/lib:$LD_LIBRARY_PATH
+
 On OSX/macOS, replace the last command with `sudo update_dyld_shared_cache`
 
 ### Build and install using vcpkg
